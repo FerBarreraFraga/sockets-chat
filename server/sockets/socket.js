@@ -8,27 +8,30 @@ io.on('connection', (client) => {
   console.log('Usuario conectado');
 
   client.on('entrarChat', (data, callback) => {
-    const { usuario } = data;
-    if (!usuario.nombre || !usuario.sala) {
+    if (!data.nombre || !data.sala) {
       return callback({
         err: true,
         mensaje: 'El nombre / sala es necesario',
       })
     }
 
-    client.join(usuario.sala);
+    client.join(data.sala);
 
-    usuarios.agregarPersona(client.id, usuario.nombre, usuario.sala);
+    usuarios.agregarPersona(client.id, data.nombre, data.sala);
 
-    client.broadcast.to(usuario.sala).emit('listaPersonas', usuarios.getPersonasPorSala());
-    callback(usuarios.getPersonasPorSala(usuario.sala));
+    client.broadcast.to(data.sala).emit('listaPersonas', usuarios.getPersonasPorSala(data.sala));
+    client.broadcast.to(data.sala).emit('crearMensaje', crearMensaje('Admin', `${data.nombre} entro.`));
+
+    callback(usuarios.getPersonasPorSala(data.sala));
   });
 
-  client.on('crearMensaje', (data) => {
+  client.on('crearMensaje', (data, callback) => {
+    console.log('creaMensaje data: ', data);
     let persona = usuarios.getPersona(client.id)
     let mensaje = crearMensaje(persona.nombre, data.mensaje);
     client.broadcast.to(persona.sala).emit('crearMensaje', mensaje);
 
+    callback(mensaje);
   });
 
   //mensajes privados
@@ -42,11 +45,10 @@ io.on('connection', (client) => {
 
   client.on('disconnect', () => {
     let personaBorrada = usuarios.eliminarPersona(client.id);
-
-    client.broadcast.to(personaBorrada.sala).emit('crearMensaje', crearMensaje('Admin', `${personaBorrada.nombre} salio`));
-
-    client.broadcast.to(personaBorrada.sala).emit('listaPersonas', usuarios.getPersonasPorSala());
-
+    if (personaBorrada) {
+      client.broadcast.to(personaBorrada.sala).emit('crearMensaje', crearMensaje('Admin', `${personaBorrada.nombre} salio`));
+      client.broadcast.to(personaBorrada.sala).emit('listaPersonas', usuarios.getPersonasPorSala(personaBorrada.sala));
+    }
   });
 
 
